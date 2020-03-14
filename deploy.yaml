@@ -1,69 +1,52 @@
-apiVersion: apps/v1
-kind: StatefulSet
+apiVersion: v1
+kind: Template
 metadata:
-  name: es-cluster
-spec:
-  serviceName: elasticsearch
-  replicas: 3
-  selector:
-    matchLabels:
-      app: elasticsearch
-  template:
+  name: elasticsearch-deploy
+  labels:
+    app: elasticsearch
+objects:
+  - apiVersion: v1
+    kind: DeploymentConfig
     metadata:
+      name: elasticsearch
       labels:
         app: elasticsearch
     spec:
-      containers:
-      - name: elasticsearch
-        image: 172.30.1.1:5000/test/elasticsearch:1
-        resources:
-            limits:
-              cpu: 1000m
-            requests:
-              cpu: 100m
-        ports:
-        - containerPort: 9200
-          name: rest
-          protocol: TCP
-        - containerPort: 9300
-          name: inter-node
-          protocol: TCP
-        volumeMounts:
+      strategy:
+        type: Recreate
+      volumes:
         - name: data
-          mountPath: /usr/share/elasticsearch/data
-        env:
-          - name: cluster.name
-            value: px-elk-demo
-          - name: node.name
-            valueFrom:
-              fieldRef:
-                fieldPath: metadata.name
-          - name: discovery.zen.ping.unicast.hosts
-            value: "es-cluster-0.elasticsearch,es-cluster-1.elasticsearch,es-cluster-2.elasticsearch"
-          - name: discovery.zen.minimum_master_nodes
-            value: "2"
-          - name: ES_JAVA_OPTS
-            value: "-Xms512m -Xmx512m"
-      initContainers:
-      - name: fix-permissions
-        image: busybox
-        command: ["sh", "-c", "chmod 777 -R 1000:1000 /usr/share/elasticsearch/data"]
-        volumeMounts:
-        - name: data
-          mountPath: /usr/share/elasticsearch/data
-      - name: increase-vm-max-map
-        image: busybox
-        command: ["sysctl", "-w", "vm.max_map_count=262144"]
-      - name: increase-fd-ulimit
-        image: busybox
-        command: ["sh", "-c", "ulimit -n 65536"]
-  volumeClaimTemplates:
-  - metadata:
-      name: data
-      labels:
-        app: elasticsearch
-    spec:
-      accessModes: [ "ReadWriteOnce" ]
-      resources:
-        requests:
-          storage: 10Gi
+          persistentVolumeClaim:
+            - claimName: data
+      replicas: 1
+      template:
+        metadata:
+          name: elasticsearch
+          labels:
+            app: elasticsearch
+            role: elasticsearch
+        spec:
+          containers:
+            - name: elasticsearch
+              image: 172.30.1.1:5000/test/elasticsearch:1
+              ports:
+              - containerPort: 9200
+                name: rest
+                protocol: TCP
+              - containerPort: 9300
+                name: inter-node
+                protocol: TCP
+              env:
+              - name: cluster.name
+                value: px-elk-demo
+              - name: node.name
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.name
+              - name: discovery.type
+                value: "single-node"
+              - name: ES_JAVA_OPTS
+                value: "-Xms512m -Xmx512m"
+              volumeMounts:
+                - name: data
+                    mountPath: /usr/share/elasticsearch/data
