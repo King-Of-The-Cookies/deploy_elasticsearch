@@ -14,10 +14,7 @@ objects:
     spec:
       strategy:
         type: Recreate
-      volumes:
-        - name: data
-          persistentVolumeClaim:
-            - claimName: data
+
       replicas: 1
       template:
         metadata:
@@ -37,16 +34,32 @@ objects:
                 name: inter-node
                 protocol: TCP
               env:
-              - name: cluster.name
-                value: px-elk-demo
-              - name: node.name
-                valueFrom:
-                  fieldRef:
-                    fieldPath: metadata.name
               - name: discovery.type
                 value: "single-node"
               - name: ES_JAVA_OPTS
                 value: "-Xms512m -Xmx512m"
               volumeMounts:
                 - name: data
-                    mountPath: /usr/share/elasticsearch/data
+                  mountPath: /usr/share/elasticsearch/data
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: "data"
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: elasticsearch
+      labels:
+        app: elasticsearch
+    spec:
+      ports:
+        - name: rest
+          port: 9200
+          targetPort: 9200
+          protocol: TCP
+        - name: inter-node
+          port: 9300
+          targetPort: 9300
+          protocol: TCP
+      selector:
+        role: elasticsearch
